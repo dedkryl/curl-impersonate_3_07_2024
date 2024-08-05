@@ -894,7 +894,7 @@ index c666192fc..5ea7d04c8 100644
  /* on receving from TLS, we prep for holding a full stream window */
  #define H2_NW_RECV_CHUNKS       (H2_STREAM_WINDOW_SIZE / H2_CHUNK_SIZE)
  /* on send into TLS, we just want to accumulate small frames */
-@@ -86,24 +87,48 @@
+@@ -86,24 +87,45 @@
   * will block their received QUOTA in the connection window. And if we
   * run out of space, the server is blocked from sending us any data.
   * See #10988 for an issue with this. */
@@ -928,9 +928,6 @@ index c666192fc..5ea7d04c8 100644
 +    i++;
 +  }
 +
-+  iv[i].settings_id = NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS;
-+  iv[i].value = Curl_multi_max_concurrent_streams(data->multi);
-+  i++;
 +
 +  iv[i].settings_id = NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE;
 +  iv[i].value = 0x600000;
@@ -952,6 +949,7 @@ index c666192fc..5ea7d04c8 100644
  }
  
  static size_t populate_binsettings(uint8_t *binsettings,
+
 @@ -1616,11 +1641,17 @@ out:
    return rv;
  }
