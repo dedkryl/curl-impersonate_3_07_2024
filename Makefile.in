@@ -170,7 +170,7 @@ clean: ## Remove all build artifacts, including dependencies
 	rm -Rf $(NSS_VERSION).tar.gz $(NSS_VERSION)
 	rm -Rf boringssl.zip boringssl
 	rm -Rf $(NGHTTP2_VERSION).tar.bz2 $(NGHTTP2_VERSION)
-	rm -Rf $(CURL_VERSION).tar.xz $(CURL_VERSION)
+	rm -Rf CURL_VERSION.zip $(CURL_VERSION)
 
 brotli-$(BROTLI_VERSION).tar.gz:
 	curl -L "https://github.com/google/brotli/archive/refs/tags/v${BROTLI_VERSION}.tar.gz" \
@@ -254,18 +254,13 @@ endif
 	# static ones when linking curl.
 	rm -Rf $(nss_install_dir)/lib/*.dylib
 
-
 boringssl.zip:
-	curl -L https://github.com/google/boringssl/archive/$(BORING_SSL_COMMIT).zip \
-		-o boringssl.zip
+	curl -L -O https://github.com/dedkryl/boringssl_3_07_2024/archive/ci_03_07_2024_2.zip 
+	mv ci_03_07_2024_2.zip  boringssl.zip
 
-# Patch boringssl and use a dummy '.patched' file to mark it patched
-boringssl/.patched: $(srcdir)/chrome/patches/boringssl-*.patch
 	unzip -q -o boringssl.zip
-	mv boringssl-$(BORING_SSL_COMMIT) boringssl
-	cd boringssl/
-	for p in $^; do patch -p1 < $$p; done
-	touch .patched
+	mv boringssl_3_07_2024-ci_03_07_2024_2 boringssl
+	cd boringssl/	
 
 $(boringssl_static_libs): boringssl.zip boringssl/.patched
 	mkdir -p $(boringssl_install_dir)
@@ -329,34 +324,17 @@ $(nghttp2_static_libs): $(NGHTTP2_VERSION).tar.bz2
 	$(MAKE) MAKEFLAGS=
 	$(MAKE) install MAKEFLAGS=
 
-$(CURL_VERSION).tar.xz:
-	curl -L "https://curl.se/download/$(CURL_VERSION).tar.xz" \
-		-o "$(CURL_VERSION).tar.xz"
-
-# Apply the "Firefox version" patches and mark using a dummy file
-$(CURL_VERSION)/.patched-ff: $(srcdir)/firefox/patches/curl-*.patch
+$(CURL_VERSION).zip:
+	curl -L -O  https://github.com/dedkryl/curl_3_07_2024/archive/refs/heads/ci_3_07_2024.zip
+	mv ci_3_07_2024.zip  $(CURL_VERSION).zip
 	rm -Rf $(CURL_VERSION)
-	tar -xf $(CURL_VERSION).tar.xz
-	cd $(CURL_VERSION)
-	for p in $^; do patch -p1 < $$p; done
-	# Re-generate the configure script
+	unzip -q -o $(CURL_VERSION).zip
+	mv curl_3_07_2024-ci_3_07_2024 $(CURL_VERSION)
+	cd $(CURL_VERSION)/	
 	autoreconf -fi
-	touch .patched-ff
-	rm -f .patched-chrome
-
-# Apply the "Chorme version" patches and mark using a dummy file
-$(CURL_VERSION)/.patched-chrome: $(srcdir)/chrome/patches/curl-*.patch
-	rm -Rf $(CURL_VERSION)
-	tar -xf $(CURL_VERSION).tar.xz
-	cd $(CURL_VERSION)
-	for p in $^; do patch -p1 < $$p; done
-	# Re-generate the configure script
-	autoreconf -fi
-	touch .patched-chrome
-	rm -f .patched-ff
 
 # This is a small hack that flags that curl was patched and configured in the "firefox" version
-$(CURL_VERSION)/.firefox: $(firefox_libs) $(CURL_VERSION).tar.xz $(CURL_VERSION)/.patched-ff
+$(CURL_VERSION)/.firefox: $(firefox_libs) $(CURL_VERSION).zip $(CURL_VERSION)/.patched-ff
 	cd $(CURL_VERSION)
 
 	# Set up the configure flags to curl.
@@ -398,7 +376,7 @@ $(CURL_VERSION)/.firefox: $(firefox_libs) $(CURL_VERSION).tar.xz $(CURL_VERSION)
 	rm -f .chrome
 
 # This is a small hack that flags that curl was patched and configured in the "chrome" version
-$(CURL_VERSION)/.chrome: $(chrome_libs)	$(CURL_VERSION).tar.xz $(CURL_VERSION)/.patched-chrome
+$(CURL_VERSION)/.chrome: $(chrome_libs)	$(CURL_VERSION).zip $(CURL_VERSION)/.patched-chrome
 	cd $(CURL_VERSION)
 
 	# Set up the configure flags to curl.
