@@ -33,8 +33,8 @@ BoringSSl и cURL собираются из веток https://github.com/dedkry
  
  Значения опции:
  
- "Chrome127_style" - для Chrome 127.0.6533.72 соответствует
-    
+ "Chrome127_style" - для Chrome 127.0.6533.72 соответствует:
+
    SETTINGS_HEADER_TABLE_SIZE;
 
    SETTINGS_ENABLE_PUSH; (if http2_no_server_push)
@@ -43,13 +43,13 @@ BoringSSl и cURL собираются из веток https://github.com/dedkry
 
    SETTINGS_MAX_HEADER_LIST_SIZE;
    
- "Safari17_5_style" - для Safari 17.5  соответствует    
-    
-    SETTINGS_MAX_CONCURRENT_STREAMS;
-    
-    SETTINGS_INITIAL_WINDOW_SIZE;
-
- "Default_style"  соответствует
+ "Safari17_5_style" - для Safari 17.5  соответствует:
+ 
+   SETTINGS_MAX_CONCURRENT_STREAMS;
+ 
+   SETTINGS_INITIAL_WINDOW_SIZE;
+  
+ "Default_style"  соответствует:
  
    SETTINGS_HEADER_TABLE_SIZE;
 
