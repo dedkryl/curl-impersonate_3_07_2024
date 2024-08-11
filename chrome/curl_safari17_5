@@ -20,5 +20,6 @@ dir=${0%/*}
     --http2 --compressed\
     --tlsv1.0 --no-tls-session-ticket \
     --cert-compression zlib \
+    --h2-settings-style "Safari17_5_style" \
     --http2-pseudo-headers-order 'mspa' \
     "$@"

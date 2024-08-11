@@ -25,5 +25,6 @@ dir=${0%/*}
     -H 'Priority: u=0, i' \
     --http2 --http2-no-server-push --compressed \
     --tlsv1.2 --alps --tls-permute-extensions \
+    --h2-settings-style "Chrome127_style" \
     --cert-compression brotli \
     "$@"
