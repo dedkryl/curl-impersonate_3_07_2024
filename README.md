@@ -63,3 +63,18 @@ BoringSSl и cURL собираются из веток https://github.com/dedkry
 
 
    Отсутствие опции в скрипте - Default_style.
+
+## Сборка и запуск
+
+git clone https://github.com/dedkryl/curl-impersonate_3_07_2024.git
+cd curl-impersonate_3_07_2024/
+./chrome_ubuntu_build_and_install.sh
+curl_chrome127 www.example.com
+вывод html... 
+
+## Сборка и запуск образа Docker
+
+git clone https://github.com/dedkryl/curl-impersonate_3_07_2024.git
+cd curl-impersonate_3_07_2024/
+sudo docker build   -t your_tag chrome/
+sudo docker run --rm your_tag curl_chrome127 https://www.example.com

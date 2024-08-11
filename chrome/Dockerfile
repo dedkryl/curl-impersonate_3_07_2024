@@ -1,10 +1,3 @@
-#
-# NOTE: THIS DOCKERFILE IS GENERATED FROM "Dockerfile.template" VIA
-# `./generate_dockerfiles.sh`
-#
-# PLEASE DO NOT EDIT IT DIRECTLY.
-#
-
 # Python is needed for building libnss.
 # Use it as a common base.
 FROM python:3.11-slim-bookworm as builder
@@ -37,30 +30,32 @@ RUN cd brotli-${BROTLI_VERSION} && \
     cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=./installed .. && \
     cmake --build . --config Release --target install
 
-# BoringSSL doesn't have versions. Choose a commit that is used in a stable
-# Chromium version.
-ARG BORING_SSL_COMMIT=1b7fdbd9101dedc3e0aa3fcf4ff74eacddb34ecc
-RUN curl -L https://github.com/google/boringssl/archive/${BORING_SSL_COMMIT}.zip -o boringssl.zip && \
-    unzip boringssl && \
-    mv boringssl-${BORING_SSL_COMMIT} boringssl
+# Get BoringSSL from own branch.
+RUN curl -L -O https://github.com/dedkryl/boringssl_3_07_2024/archive/ci_03_07_2024_2.zip && \
+        mv ci_03_07_2024_2.zip  boringssl.zip && \
+        unzip -q -o boringssl.zip && \
+        mv boringssl_3_07_2024-ci_03_07_2024_2 boringssl 
 
+WORKDIR /build/boringssl
+
+RUN mkdir build
+RUN mkdir build/lib
 # Compile BoringSSL.
 # See https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md
-COPY patches/boringssl-*.patch boringssl/
-RUN cd boringssl && \
-    for p in $(ls boringssl-*.patch); do patch -p1 < $p; done && \
-    mkdir build && cd build && \
-    cmake \
+RUN cd build && \
+        cmake \
         -DCMAKE_C_FLAGS="-Wno-error=array-bounds -Wno-error=stringop-overflow" \
         -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=on -GNinja .. && \
-    ninja
+        ninja
 
 # Fix the directory structure so that curl can compile against it.
 # See https://everything.curl.dev/source/build/tls/boringssl
-RUN mkdir boringssl/build/lib && \
-    ln -s ../crypto/libcrypto.a boringssl/build/lib/libcrypto.a && \
-    ln -s ../ssl/libssl.a boringssl/build/lib/libssl.a && \
-    cp -R boringssl/include boringssl/build
+RUN ln -s /build/boringssl/build/crypto/libcrypto.a /build/boringssl/build/lib/libcrypto.a && \
+    ln -s /build/boringssl/build/ssl/libssl.a /build/boringssl/build/lib/libssl.a && \
+    cp -R /build/boringssl/include /build/boringssl/build/include
+    
+
+WORKDIR /build
 
 ARG NGHTTP2_VERSION=nghttp2-1.56.0
 ARG NGHTTP2_URL=https://github.com/nghttp2/nghttp2/releases/download/v1.56.0/nghttp2-1.56.0.tar.bz2
@@ -74,20 +69,20 @@ RUN cd ${NGHTTP2_VERSION} && \
     ./configure --prefix=/build/${NGHTTP2_VERSION}/installed --with-pic --disable-shared && \
     make && make install
 
-# Download curl.
-ARG CURL_VERSION=curl-8.1.1
-RUN curl -o ${CURL_VERSION}.tar.xz https://curl.se/download/${CURL_VERSION}.tar.xz
-RUN tar xf ${CURL_VERSION}.tar.xz
+WORKDIR /build    
 
-# Patch curl and re-generate the configure script
-COPY patches/curl-*.patch ${CURL_VERSION}/
-RUN cd ${CURL_VERSION} && \
-    for p in $(ls curl-*.patch); do patch -p1 < $p; done && \
-    autoreconf -fi
+# Download curl from own branch (8.1.1 patched already).
+RUN curl -L -O  https://github.com/dedkryl/curl_3_07_2024/archive/refs/heads/ci_3_07_2024.zip && \
+            mv ci_3_07_2024.zip  curl-8.1.1.zip && \
+            rm -Rf curl-8.1.1 && \
+            unzip -q -o curl-8.1.1.zip && \
+            mv curl_3_07_2024-ci_3_07_2024 curl-8.1.1 && \
+            cd curl-8.1.1	&& \
+            autoreconf -fi
 
 # Compile curl with nghttp2, libbrotli and nss (firefox) or boringssl (chrome).
 # Enable keylogfile for debugging of TLS traffic.
-RUN cd ${CURL_VERSION} && \
+RUN cd curl-8.1.1 && \
     ./configure --prefix=/build/install \
                 --enable-static \
                 --disable-shared \
@@ -98,65 +93,67 @@ RUN cd ${CURL_VERSION} && \
                 LIBS="-pthread" \
                 CFLAGS="-I/build/boringssl/build" \
                 USE_CURL_SSLKEYLOGFILE=true && \
-    make && make install
+                make && make install
 
-RUN mkdir out && \
-    cp /build/install/bin/curl-impersonate-chrome out/ && \
-    ln -s curl-impersonate-chrome out/curl-impersonate && \
-    strip out/curl-impersonate
-
-# Verify that the resulting 'curl' has all the necessary features.
-RUN ./out/curl-impersonate -V | grep -q zlib && \
-    ./out/curl-impersonate -V | grep -q brotli && \
-    ./out/curl-impersonate -V | grep -q nghttp2 && \
-    ./out/curl-impersonate -V | grep -q -e NSS -e BoringSSL && \
-    ./out/curl-impersonate -V | grep -q -e wss
-
-# Verify that the resulting 'curl' is really statically compiled
-RUN ! (ldd ./out/curl-impersonate | grep -q -e libcurl -e nghttp2 -e brotli -e ssl -e crypto)
-
-RUN rm -Rf /build/install
-
-# Re-compile libcurl dynamically
-RUN cd ${CURL_VERSION} && \
-    ./configure --prefix=/build/install \
-                --enable-websockets \
-                --with-nghttp2=/build/${NGHTTP2_VERSION}/installed \
-                --with-brotli=/build/brotli-${BROTLI_VERSION}/build/installed \
-                --with-openssl=/build/boringssl/build \
-                LIBS="-pthread" \
-                CFLAGS="-I/build/boringssl/build" \
-                USE_CURL_SSLKEYLOGFILE=true && \
-    make clean && make && make install
-
-# Copy libcurl-impersonate and symbolic links
-RUN cp -d /build/install/lib/libcurl-impersonate* /build/out
-
-RUN ver=$(readlink -f ${CURL_VERSION}/lib/.libs/libcurl-impersonate-chrome.so | sed 's/.*so\.//') && \
-    major=$(echo -n $ver | cut -d'.' -f1) && \
-    ln -s "libcurl-impersonate-chrome.so.$ver" "out/libcurl-impersonate.so.$ver" && \
-    ln -s "libcurl-impersonate.so.$ver" "out/libcurl-impersonate.so" && \
-    strip "out/libcurl-impersonate.so.$ver"
-
-# Verify that the resulting 'libcurl' is really statically compiled against its
-# dependencies.
-RUN ! (ldd ./out/curl-impersonate | grep -q -e nghttp2 -e brotli -e ssl -e crypto)
-
-# Wrapper scripts
-COPY curl_chrome* curl_edge* curl_safari* out/
-RUN chmod +x out/curl_*
-
-# Create a final, minimal image with the compiled binaries
-# only.
-FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-# Copy curl-impersonate from the builder image
-COPY --from=builder /build/out/curl-impersonate* /usr/local/bin
-COPY --from=builder /build/out/libcurl-impersonate* /usr/local/lib
-# Update the loader's cache
-RUN ldconfig
-# Copy to /build/out as well for backward compatibility with previous versions.
-COPY --from=builder /build/out /build/out
-# Wrapper scripts
-COPY --from=builder /build/out/curl_* /usr/local/bin/
+                RUN mkdir out && \
+                cp /build/install/bin/curl-impersonate-chrome out/ && \
+                ln -s curl-impersonate-chrome out/curl-impersonate && \
+                strip out/curl-impersonate
+            
+            # Verify that the resulting 'curl' has all the necessary features.
+            RUN ./out/curl-impersonate -V | grep -q zlib && \
+                ./out/curl-impersonate -V | grep -q brotli && \
+                ./out/curl-impersonate -V | grep -q nghttp2 && \
+                ./out/curl-impersonate -V | grep -q -e NSS -e BoringSSL && \
+                ./out/curl-impersonate -V | grep -q -e wss
+            
+            # Verify that the resulting 'curl' is really statically compiled
+            RUN ! (ldd ./out/curl-impersonate | grep -q -e libcurl -e nghttp2 -e brotli -e ssl -e crypto)
+            
+            RUN rm -Rf /build/install
+            
+            # Re-compile libcurl dynamically
+            RUN cd curl-8.1.1 && \
+                autoreconf -fi && \
+                ./configure --prefix=/build/install \
+                            --enable-websockets \
+                            --with-nghttp2=/build/${NGHTTP2_VERSION}/installed \
+                            --with-brotli=/build/brotli-${BROTLI_VERSION}/build/installed \
+                            --with-openssl=/build/boringssl/build \
+                            LIBS="-pthread" \
+                            CFLAGS="-I/build/boringssl/build" \
+                            USE_CURL_SSLKEYLOGFILE=true && \
+                make clean && make && make install
+            
+            # Copy libcurl-impersonate and symbolic links
+            RUN cp -d /build/install/lib/libcurl-impersonate* /build/out
+            
+            RUN ver=$(readlink -f curl-8.1.1/lib/.libs/libcurl-impersonate-chrome.so | sed 's/.*so\.//') && \
+                major=$(echo -n $ver | cut -d'.' -f1) && \
+                ln -s "libcurl-impersonate-chrome.so.$ver" "out/libcurl-impersonate.so.$ver" && \
+                ln -s "libcurl-impersonate.so.$ver" "out/libcurl-impersonate.so" && \
+                strip "out/libcurl-impersonate.so.$ver"
+            
+            # Verify that the resulting 'libcurl' is really statically compiled against its
+            # dependencies.
+            RUN ! (ldd ./out/curl-impersonate | grep -q -e nghttp2 -e brotli -e ssl -e crypto)
+            
+            # Wrapper scripts
+            COPY curl_chrome* curl_edge* curl_safari* out/
+            RUN chmod +x out/curl_*
+            
+            # Create a final, minimal image with the compiled binaries
+            # only.
+            FROM debian:bookworm-slim
+            RUN apt-get update && apt-get install -y ca-certificates \
+                && rm -rf /var/lib/apt/lists/*
+            # Copy curl-impersonate from the builder image
+            COPY --from=builder /build/out/curl-impersonate* /usr/local/bin
+            COPY --from=builder /build/out/libcurl-impersonate* /usr/local/lib
+            # Update the loader's cache
+            RUN ldconfig
+            # Copy to /build/out as well for backward compatibility with previous versions.
+            COPY --from=builder /build/out /build/out
+            # Wrapper scripts
+            COPY --from=builder /build/out/curl_* /usr/local/bin/
+            
