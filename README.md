@@ -3,8 +3,11 @@
 новых версий браузеров.
 
 В настоящий момент (август 2024) добавлена поддержка
-Chrome 127.0.6533.72 (для Ubuntu 20.04 и Windows 11) и Safari 17.5. См. скрипты
- curl_chrome127, curl_chrome127_win и curl_safari17_5 соответственно.
+- curl_chrome127 : Chrome 127.0.6533.72 (для Ubuntu 20.04) и Safari 17.5,
+- curl_chrome127_win :  Chrome 127.0.6533.72 (для Windows 11),
+- curl_safari17_5 : Safari 17.5 (Mac OS Monterey 12.7.6),
+- curl_safari17_1_arm : Safari 17.1 (Apple M2, Sonoma 14.1),
+- curl_safari17_1_iphone : Safari 17.1 (iPhone 15 Pro, iOS version 17.5.1).
 
 ## Изменения главной ветки
 
@@ -27,7 +30,7 @@ BoringSSl и cURL собираются из веток https://github.com/dedkry
  4) Изменения содержания и порядка следования в заголовках HTTP,
  5) Добавлении опции --h2-settings-style.
  
- Выявлены существенные отличия в содержании кадра SETTINGS между Chrome 127 , Safari 17.5 и curl-impersonate с curl 8.1.1.
+ Выявлены существенные отличия в содержании кадра SETTINGS между Chrome 127 , Safari 17.5,  Safari 17.1 и curl-impersonate с curl 8.1.1.
  Требуемые настройки в последней версии curl - отсутствуют, поэтому была проведена доработка используемого  curl_3_07_2024 с добавлением
  опции --h2-settings-style.
  
@@ -48,7 +51,15 @@ BoringSSl и cURL собираются из веток https://github.com/dedkry
    SETTINGS_MAX_CONCURRENT_STREAMS;
  
    SETTINGS_INITIAL_WINDOW_SIZE;
-  
+
+"Safari17_1_style" - для Safari 17.1  соответствует:
+ 
+   SETTINGS_ENABLE_PUSH;
+
+   SETTINGS_INITIAL_WINDOW_SIZE;
+   
+   SETTINGS_MAX_CONCURRENT_STREAMS;
+
  "Default_style"  соответствует:
  
    SETTINGS_HEADER_TABLE_SIZE;
