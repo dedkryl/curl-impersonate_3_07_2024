@@ -17,7 +17,7 @@ dir=${0%/*}
     -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15' \
     -H 'Accept-Language: en-GB,en;q=0.9' \
     -H 'Sec-Fetch-Dest: document' \
-    --http2 --compressed\
+    --http2 --http2-no-server-push --compressed\
     --tlsv1.0 --no-tls-session-ticket \
     --cert-compression zlib \
     --h2-settings-style "Safari17_1_style" \
